@@ -61,7 +61,8 @@
 		"postMessage":           true,
 		"onmessage":             true,
 		"scrypt_module_factory": true,
-		"QUnit":                 true
+		"QUnit":                 true,
+		"Base58":                true
 	}
 
 }

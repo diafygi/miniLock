@@ -21,6 +21,10 @@ var base64Match = new RegExp(
 	'^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$'
 )
 
+var base58Match = new RegExp(
+	'^[1-9ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$'
+)
+
 // Input: String
 // Output: Boolean
 // Notes: Validates if string is a proper miniLock ID.
@@ -31,7 +35,7 @@ var validateID = function(id) {
 	) {
 		return false
 	}
-	if ((new RegExp('^[A-Za-z0-9]+$')).test(id)) {
+	if (base58Match.test(id)) {
 		var bytes = Base58.decode(id)
 		return bytes.length === 32 + 16
 	}
