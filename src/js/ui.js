@@ -55,7 +55,7 @@ $('form.unlockForm').submit(function() {
 			)
 		)
 		$('span.keyStrengthMoreInfo').unbind().click(function() {
-			$('div.keyStrength').animate({height: 180})
+			$('div.keyStrength').animate({height: 243})
 		})
 		$('div.keyStrength input[type=text]').click(function() {
 			$(this).select()
