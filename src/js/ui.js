@@ -33,7 +33,8 @@ $('form.unlockForm').submit(function() {
 				clearInterval(keyReadyInterval)
 				$('div.myMiniLockID input').val(
 					miniLock.crypto.getMiniLockID(
-						miniLock.session.keys.publicKey
+						miniLock.session.keys.publicKey,
+						miniLock.session.salt
 					)
 				)
 				$('div.unlock').delay(200).fadeOut(200, function() {
@@ -153,7 +154,7 @@ miniLock.UI.handleFileSelection = function(file) {
 			miniLock.crypto.decryptFile(
 				result,
 				miniLock.session.keys.publicKey,
-				miniLock.session.keys.secretKey,
+				miniLock.session.baseKey,
 				'miniLock.crypto.workerDecryptionCallback'
 			)
 			miniLock.UI.animateProgressBar(file.size, 'decrypt')
@@ -217,7 +218,8 @@ $('input.encryptFile').click(function() {
 	if (encryptToSelf) {
 		miniLockIDs.push(
 			miniLock.crypto.getMiniLockID(
-				miniLock.session.keys.publicKey
+				miniLock.session.keys.publicKey,
+				miniLock.session.salt
 			)
 		)
 	}
@@ -235,6 +237,7 @@ $('input.encryptFile').click(function() {
 			miniLockIDs,
 			miniLock.session.keys.publicKey,
 			miniLock.session.keys.secretKey,
+			miniLock.session.salt,
 			'miniLock.crypto.workerEncryptionCallback'
 		)
 		$('form.fileSelectForm input[type=reset]').click()

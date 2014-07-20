@@ -28,7 +28,7 @@ var onmessage = function(message) {
 	var scrypt = scrypt_module_factory()
 	var keyBytes = scrypt.crypto_scrypt(
 		message.data.key,
-		scrypt.encode_utf8('miniLockScrypt..'),
+		message.data.salt,
 		Math.pow(2, 17), 8, 1, 32
 	)
 	/*jshint +W106 */

@@ -17,6 +17,8 @@ miniLock.settings.minKeyEntropy = 100
 // This is where session variables are stored
 miniLock.session = {
 	keys: {},
+	salt: null,
+	baseKey: null,
 	keyPairReady: false
 }
 
@@ -30,18 +32,15 @@ miniLock.util = {}
 // Output: Boolean
 // Notes: Validates if string is a proper miniLock ID.
 miniLock.util.validateID = function(id) {
-	var base64Match = new RegExp(
-		'^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$'
-	)
 	if (
-		(id.length > 50) ||
-		(id.length < 40)
+		(id.length > 70) ||
+		(id.length < 60)
 	) {
 		return false
 	}
-	if (base64Match.test(id)) {
+	if ((new RegExp('^[A-Za-z0-9]+$')).test(id)) {
 		var bytes = Base58.decode(id)
-		return bytes.length === 32
+		return bytes.length === 32 + 16
 	}
 	return false
 }
@@ -160,9 +159,10 @@ miniLock.crypto.workerDecryptionCallback = function(message) {
 // Result: Calls the scrypt Web Worker which returns
 //	32 bytes of key material in a Uint8Array,
 //	which then passed to the callback.
-miniLock.crypto.getScryptKey = function(key, callback) {
+miniLock.crypto.getScryptKey = function(key, salt, callback) {
 	var scryptWorker = new Worker('js/workers/scrypt.js')
 	scryptWorker.postMessage({
+		salt: salt,
 		key: key
 	})
 	scryptWorker.onmessage = function(message) {
@@ -181,12 +181,16 @@ miniLock.crypto.checkKeyStrength = function(key) {
 // Input: User key
 // Result: Object: {
 //	publicKey: Public encryption key (Uint8Array),
-//	secretKey: Secret encryption key (Uint8Array)
+//	secretKey: Secret encryption key (Uint8Array),
+//	salt: Session salt (Uint8Array)
 // }
 miniLock.crypto.getKeyPair = function(key) {
 	key = nacl.hash(nacl.util.decodeUTF8(key))
-	miniLock.crypto.getScryptKey(key, function(keyBytes) {
+	var salt = miniLock.crypto.getSalt()
+	miniLock.crypto.getScryptKey(key, salt, function(keyBytes) {
 		miniLock.session.keys = nacl.box.keyPair.fromSecretKey(keyBytes)
+		miniLock.session.salt = salt
+		miniLock.session.baseKey = key
 		miniLock.session.keyPairReady = true
 	})
 }
@@ -203,10 +207,21 @@ miniLock.crypto.getFileKey = function() {
 	return nacl.randomBytes(32)
 }
 
-// Input: Public encryption key (Uint8Array)
+// Input: none
+// Output: Salt for usage in miniLock.crypto.getScryptKey() hashing operations
+miniLock.crypto.getSalt = function() {
+	return nacl.randomBytes(16)
+}
+
+// Input:
+//	publicKey: Public encryption key (Uint8Array)
+//	salt: Session salt (Uint8Array)
 // Output: miniLock ID (Base58)
-miniLock.crypto.getMiniLockID = function(publicKey) {
-	return Base58.encode(publicKey)
+miniLock.crypto.getMiniLockID = function(publicKey, salt) {
+	var tmpID = new Uint8Array(publicKey.byteLength + salt.byteLength)
+	tmpID.set(new Uint8Array(publicKey), 0)
+	tmpID.set(new Uint8Array(salt), publicKey.byteLength)
+	return Base58.encode(tmpID)
 }
 
 // Input: Object:
@@ -225,14 +240,15 @@ miniLock.crypto.getMiniLockID = function(publicKey) {
 miniLock.crypto.encryptFile = function(
 	file,
 	saveName,
-	publicKeys,
+	miniLockIDs,
 	myPublicKey,
 	mySecretKey,
+	salt,
 	callback
 ) {
 	saveName += '.minilock'
 	var nonces = []
-	for (var i = 0; i < publicKeys.length; i++) {
+	for (var i = 0; i < miniLockIDs.length; i++) {
 		nonces.push(
 			nacl.util.encodeBase64(
 				miniLock.crypto.getNonce()
@@ -247,9 +263,10 @@ miniLock.crypto.encryptFile = function(
 		fileKey: miniLock.crypto.getFileKey(),
 		fileNonce: miniLock.crypto.getNonce(),
 		nonces: nonces,
-		publicKeys: publicKeys,
+		miniLockIDs: miniLockIDs,
 		myPublicKey: myPublicKey,
 		mySecretKey: mySecretKey,
+		salt: salt,
 		callback: callback
 	})
 }
@@ -268,14 +285,14 @@ miniLock.crypto.encryptFile = function(
 miniLock.crypto.decryptFile = function(
 	file,
 	myPublicKey,
-	mySecretKey,
+	baseKey,
 	callback
 ) {
 	miniLock.crypto.worker.postMessage({
 		operation: 'decrypt',
 		data: new Uint8Array(file.data),
 		myPublicKey: myPublicKey,
-		mySecretKey: mySecretKey,
+		baseKey: baseKey,
 		callback: callback
 	})
 }

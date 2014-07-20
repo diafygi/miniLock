@@ -7,6 +7,7 @@ var window = {}
 /*jshint +W079 */
 importScripts(
 	'../lib/crypto/nacl.js',
+	'../lib/crypto/scrypt.js',
 	'../lib/indexOfMulti.js',
 	'../lib/base58.js'
 )
@@ -25,14 +26,14 @@ var base64Match = new RegExp(
 // Notes: Validates if string is a proper miniLock ID.
 var validateID = function(id) {
 	if (
-		(id.length > 50) ||
-		(id.length < 40)
+		(id.length > 70) ||
+		(id.length < 60)
 	) {
 		return false
 	}
-	if (base64Match.test(id)) {
+	if ((new RegExp('^[A-Za-z0-9]+$')).test(id)) {
 		var bytes = Base58.decode(id)
-		return bytes.length === 32
+		return bytes.length === 32 + 16
 	}
 	return false
 }
@@ -71,6 +72,35 @@ var validateKey = function(key) {
 	return false
 }
 
+// Input:
+//	publicKey: my public key (Uint8Array)
+//	salt: Session salt (Uint8Array)
+// Output: miniLockID (Base58)
+// Notes: Combines session salt and public key into one Base58 string
+var encodeID = function(publicKey, salt) {
+	var tmpID = new Uint8Array(publicKey.byteLength + salt.byteLength)
+	tmpID.set(new Uint8Array(publicKey), 0)
+	tmpID.set(new Uint8Array(salt), publicKey.byteLength)
+	return Base58.encode(tmpID)
+}
+
+// Input: miniLockID (Base58)
+// Output: Object: {
+//	publicKey: public key (Uint8Array),
+//	salt: Session salt (Uint8Array),
+// }
+// Notes: Breaks up the miniLockID into the public key and salt components
+var decodeID = function(miniLockID) {
+	var tmpID = Base58.decode(miniLockID)
+	var keyLength = tmpID.byteLength - 16
+	var publicKey = tmpID.subarray(0, keyLength)
+	var salt = tmpID.subarray(keyLength, tmpID.byteLength)
+	return {
+		publicKey: publicKey,
+		salt: salt
+	}
+}
+
 // -----------------------
 // Cryptographic functions
 // -----------------------
@@ -86,7 +116,8 @@ var validateKey = function(key) {
 //		fileNonce: 24-byte nonce used for file encryption/decryption (Uint8Array),
 //		publicKeys: Array of (Base58) public keys to encrypt to (not used for 'decrypt' operation),
 //		myPublicKey: My public key (Uint8Array),
-//		mySecretKey: My secret key (Uint8Array)
+//		mySecretKey: My secret key (Uint8Array),
+//		salt: Session salt (Uint8Array)
 //	}
 // Result: When finished, the worker will return the result
 // 	which is supposed to be caught and processed by
@@ -126,7 +157,7 @@ message = message.data
 if (message.operation === 'encrypt') {
 	(function() {
 		var info = {
-			senderID: Base58.encode(message.myPublicKey),
+			senderID: encodeID(message.myPublicKey, message.salt),
 			fileInfo: {}
 		}
 		var fileInfo = {
@@ -138,14 +169,18 @@ if (message.operation === 'encrypt') {
 			fileInfo.fileName += String.fromCharCode(0x00)
 		}
 		fileInfo = JSON.stringify(fileInfo)
-		for (var i = 0; i < message.publicKeys.length; i++) {
+		for (var i = 0; i < message.miniLockIDs.length; i++) {
+			var decodedMiniLockID = decodeID(message.miniLockIDs[i])
 			var encryptedFileInfo = nacl.box(
 				nacl.util.decodeUTF8(fileInfo),
 				nacl.util.decodeBase64(message.nonces[i]),
-				Base58.decode(message.publicKeys[i]),
+				decodedMiniLockID.publicKey,
 				message.mySecretKey
 			)
-			info.fileInfo[message.nonces[i]] = nacl.util.encodeBase64(encryptedFileInfo)
+			info.fileInfo[message.nonces[i]] = {
+				encHeader: nacl.util.encodeBase64(encryptedFileInfo),
+				salt: nacl.util.encodeBase64(decodedMiniLockID.salt)
+			}
 		}
 		var encrypted = nacl.secretbox(
 			message.data,
@@ -166,7 +201,7 @@ if (message.operation === 'encrypt') {
 			name: message.name,
 			saveName: message.saveName,
 			info: info,
-			senderID: Base58.encode(message.myPublicKey),
+			senderID: encodeID(message.myPublicKey, message.salt),
 			error: false,
 			callback: message.callback
 		})
@@ -220,7 +255,7 @@ if (message.operation === 'decrypt') {
 				&& validateNonce(i)
 			) {
 				try {
-					nacl.util.decodeBase64(info.fileInfo[i])
+					nacl.util.decodeBase64(info.fileInfo[i].encHeader)
 				}
 				catch(err) {
 					postMessage({
@@ -230,11 +265,18 @@ if (message.operation === 'decrypt') {
 					throw new Error('miniLock: Decryption failed - could not parse file header')
 					return false
 				}
+				//use the salt to generate the test keyPair
+				var scrypt = scrypt_module_factory()
+				var testKeyBytes = scrypt.crypto_scrypt(
+					message.baseKey,
+					nacl.util.decodeBase64(info.fileInfo[i].salt),
+					Math.pow(2, 17), 8, 1, 32
+				)
 				actualFileInfo = nacl.box.open(
-					nacl.util.decodeBase64(info.fileInfo[i]),
+					nacl.util.decodeBase64(info.fileInfo[i].encHeader),
 					nacl.util.decodeBase64(i),
-					Base58.decode(info.senderID),
-					message.mySecretKey
+					decodeID(info.senderID).publicKey,
+					testKeyBytes
 				)
 				if (actualFileInfo) {
 					try {
