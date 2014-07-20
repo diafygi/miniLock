@@ -2,10 +2,10 @@
 QUnit.test('validateID', function(assert) {
 	'use strict';
 	var IDs = [
-		Base58.encode((nacl.box.keyPair()).publicKey),
-		Base58.encode((nacl.box.keyPair()).publicKey),
-		Base58.encode((nacl.box.keyPair()).publicKey),
-		Base58.encode((nacl.box.keyPair()).publicKey)
+		miniLock.crypto.getMiniLockID((nacl.box.keyPair()).publicKey, miniLock.crypto.getSalt()),
+		miniLock.crypto.getMiniLockID((nacl.box.keyPair()).publicKey, miniLock.crypto.getSalt()),
+		miniLock.crypto.getMiniLockID((nacl.box.keyPair()).publicKey, miniLock.crypto.getSalt()),
+		miniLock.crypto.getMiniLockID((nacl.box.keyPair()).publicKey, miniLock.crypto.getSalt()),
 	]
 	var notIDs = [
 		'clearly not an ID',

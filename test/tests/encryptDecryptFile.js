@@ -13,11 +13,12 @@ QUnit.asyncTest('encryptDecryptFile', function(assert) {
 				result,
 				result.name,
 				[
-					'9E3EcYNuD7KwjxDTLP4qc5LD26M4KXvCJiMECGuwmDFe',
-					'63mRPY9snLiY9XoX55iMoK6S4Ai9wkPS1J1qS7uEPn1E'
+					'3HCvcCakcWCSeY1NkNxSmZMGAm8BJ7hencUTXUDH3PKVWHPJuCW8vUGf1BNBF7wTrP',
+					'w7ZKkzB3kyjjbyuiuFXP5TDTC35i54MDXwwzN7mSU3mfVEhLDZzgjzCYZJ9DRi4aX'
 				],
-				Base58.decode('9E3EcYNuD7KwjxDTLP4qc5LD26M4KXvCJiMECGuwmDFe'),
-				Base58.decode('7S4YTmjkexJ2yeMAtoEKYc2wNMHseMqDH6YyBqKKkUon'),
+				Base58.decode('2iHTmqFtKEK5Xd3fi6sd5VguwCP3MeejFvBmazL8327m'),
+				Base58.decode('815vjksSb41chLWJVXBn3jYiPW9H1qs3AxEtugqWDEzC'),
+				Base58.decode('79S6JKbUEKDWApQuf7KssZ'),
 				'miniLock.test.encryptFileCallback'
 			)
 		})
@@ -26,13 +27,13 @@ QUnit.asyncTest('encryptDecryptFile', function(assert) {
 	miniLock.test.encryptFileCallback = function(message) {
 		assert.deepEqual(message.name, 'test.jpg', 'Original file name')
 		assert.deepEqual(message.saveName, 'test.jpg.minilock', 'Encrypted file name')
-		assert.deepEqual(message.blob.size, 352839, 'Encrypted file size')
+		assert.deepEqual(message.blob.size, 352956, 'Encrypted file size')
 		miniLock.file.get(message.blob, function(result) {
 			result.name = 'userHasChangedTheName.minilock'
 			miniLock.crypto.decryptFile(
 				result,
-				Base58.decode('63mRPY9snLiY9XoX55iMoK6S4Ai9wkPS1J1qS7uEPn1E'),
-				Base58.decode('B47Ez1ftjTPSL5Mu74YaQ33WAbDjNcBwYWnx7Fp6kvmr'),
+				Base58.decode('2iHTmqFtKEK5Xd3fi6sd5VguwCP3MeejFvBmazL8327m'),
+				Base58.decode('3jKVcp6Xp3CmHsYowcfpRZ3Cn1kLVokFu1zfKM6DMHmfmdkXBTALz715gxJdeQEKmKzAqKLw4TvCc8mFVhRNK5of'),
 				'miniLock.test.decryptFileCallback'
 			)
 		})
