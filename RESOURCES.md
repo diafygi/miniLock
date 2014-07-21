@@ -2,7 +2,7 @@
 
 ##bs58
 Origin: https://github.com/cryptocoinjs/bs58
-License: None (?)
+License: MIT
 
 ##iOS 7 Style Switches
 Origin: http://codepen.io/BandarRaffah/pen/ibwje

@@ -160,7 +160,7 @@ message = message.data
 // We have received a request to encrypt
 if (message.operation === 'encrypt') {
 	(function() {
-		var info = {
+		var header = {
 			senderID: encodeID(message.myPublicKey, message.salt),
 			fileInfo: {}
 		}
@@ -181,7 +181,7 @@ if (message.operation === 'encrypt') {
 				decodedMiniLockID.publicKey,
 				message.mySecretKey
 			)
-			info.fileInfo[message.nonces[i]] = {
+			header.fileInfo[message.nonces[i]] = {
 				encHeader: nacl.util.encodeBase64(encryptedFileInfo),
 				salt: nacl.util.encodeBase64(decodedMiniLockID.salt)
 			}
@@ -204,7 +204,7 @@ if (message.operation === 'encrypt') {
 			data: encrypted,
 			name: message.name,
 			saveName: message.saveName,
-			info: info,
+			header: header,
 			senderID: encodeID(message.myPublicKey, message.salt),
 			error: false,
 			callback: message.callback
@@ -222,11 +222,11 @@ if (message.operation === 'decrypt') {
 			0x45, 0x6e, 0x64, 0x49,
 			0x6e, 0x66, 0x6f, 0x2e
 		]
-		var miniLockInfoEndIndex, info
+		var miniLockInfoEndIndex, header
 		try {
 			miniLockInfoEndIndex = message.data.indexOfMulti(miniLockInfoEnd)
-			info = nacl.util.encodeUTF8(message.data.subarray(16, miniLockInfoEndIndex))
-			info = JSON.parse(info)
+			header = nacl.util.encodeUTF8(message.data.subarray(16, miniLockInfoEndIndex))
+			header = JSON.parse(header)
 			message.data = message.data.subarray(
 				miniLockInfoEndIndex + miniLockInfoEnd.length,
 				message.data.length
@@ -241,8 +241,8 @@ if (message.operation === 'decrypt') {
 			return false
 		}
 		if (
-			!info.hasOwnProperty('senderID')
-			|| !validateID(info.senderID)
+			!header.hasOwnProperty('senderID')
+			|| !validateID(header.senderID)
 		) {
 			postMessage({
 				operation: 'decrypt',
@@ -253,13 +253,13 @@ if (message.operation === 'decrypt') {
 		}
 		// Attempt fileInfo decryptions until one succeeds
 		var actualFileInfo = false
-		for (var i in info.fileInfo) {
+		for (var i in header.fileInfo) {
 			if (
-				({}).hasOwnProperty.call(info.fileInfo, i)
+				({}).hasOwnProperty.call(header.fileInfo, i)
 				&& validateNonce(i)
 			) {
 				try {
-					nacl.util.decodeBase64(info.fileInfo[i].encHeader)
+					nacl.util.decodeBase64(header.fileInfo[i].encHeader)
 				}
 				catch(err) {
 					postMessage({
@@ -273,13 +273,13 @@ if (message.operation === 'decrypt') {
 				var scrypt = scrypt_module_factory()
 				var testKeyBytes = scrypt.crypto_scrypt(
 					message.baseKey,
-					nacl.util.decodeBase64(info.fileInfo[i].salt),
+					nacl.util.decodeBase64(header.fileInfo[i].salt),
 					Math.pow(2, 17), 8, 1, 32
 				)
 				actualFileInfo = nacl.box.open(
-					nacl.util.decodeBase64(info.fileInfo[i].encHeader),
+					nacl.util.decodeBase64(header.fileInfo[i].encHeader),
 					nacl.util.decodeBase64(i),
-					decodeID(info.senderID).publicKey,
+					decodeID(header.senderID).publicKey,
 					testKeyBytes
 				)
 				if (actualFileInfo) {
@@ -341,7 +341,7 @@ if (message.operation === 'decrypt') {
 			data: decrypted,
 			name: actualFileInfo.fileName,
 			saveName: actualFileInfo.fileName,
-			senderID: info.senderID,
+			senderID: header.senderID,
 			error: false,
 			callback: message.callback
 		})

@@ -117,7 +117,7 @@ miniLock.crypto.worker.onmessage = function(message) {
 		if (message.operation === 'encrypt') {
 			message.blob = new Blob([
 				'miniLockFileYes.',
-				JSON.stringify(message.info),
+				JSON.stringify(message.header),
 				'miniLockEndInfo.',
 				new Uint8Array(message.data)
 			], {type: 'application/minilock'})

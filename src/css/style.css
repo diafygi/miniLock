@@ -276,7 +276,7 @@ input.fileSelectDialog {
 
 div.myMiniLockID {
 	border-radius: 10px;
-	width: 442px;
+	width: 455px;
 	margin: 50px auto 0 auto;
 }
 
@@ -301,7 +301,7 @@ div.myMiniLockID input {
 	position: relative;
 	bottom: 2px;
 	height: 18px;
-	width: 320px;
+	width: 333px;
 	border-radius: 0 5px 5px 0;
 	background: rgba(255, 255, 255, 0.1);
 	font-family: monospace;
