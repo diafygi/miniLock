@@ -270,12 +270,14 @@ if (message.operation === 'decrypt') {
 					return false
 				}
 				//use the salt to generate the test keyPair
+				/*jshint -W106 */
 				var scrypt = scrypt_module_factory()
 				var testKeyBytes = scrypt.crypto_scrypt(
 					message.baseKey,
 					nacl.util.decodeBase64(header.fileInfo[i].salt),
 					Math.pow(2, 17), 8, 1, 32
 				)
+				/*jshint +W106 */
 				actualFileInfo = nacl.box.open(
 					nacl.util.decodeBase64(header.fileInfo[i].encHeader),
 					nacl.util.decodeBase64(i),

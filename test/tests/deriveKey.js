@@ -22,12 +22,14 @@ QUnit.asyncTest('deriveKey', function(assert) {
 			assert.deepEqual(miniLock.session.salt.length, 16, 'Session salt length')
 
 			//set a known salt
+			/*jshint -W106 */
 			var scrypt = scrypt_module_factory()
 			var testKeyBytes = scrypt.crypto_scrypt(
 				miniLock.session.baseKey,
 				knownSalt,
 				Math.pow(2, 17), 8, 1, 32
 			)
+			/*jshint +W106 */
 			var testKeyPair = nacl.box.keyPair.fromSecretKey(testKeyBytes)
 			assert.deepEqual(
 				Base58.encode(testKeyPair.publicKey),
