@@ -52,14 +52,7 @@ miniLock.util.validateID = function(id) {
 // Output: Random string suitable for use as filename.
 miniLock.util.getRandomFilename = function() {
 	var randomBytes = nacl.randomBytes(18)
-	var filename = ''
-	randomBytes = nacl.util.encodeBase64(randomBytes)
-	for (var i = 0; i < randomBytes.length; i++) {
-		if (randomBytes[i].match(/\w/)) {
-			filename += randomBytes[i]
-		}
-	}
-	return filename
+	return Base58.encode(randomBytes)
 }
 
 // Input: Filename (String)
@@ -250,12 +243,20 @@ miniLock.crypto.encryptFile = function(
 	callback
 ) {
 	saveName += '.minilock'
-	var nonces = []
+	var fileInfoNonces = []
+	var fileKeyNonces  = []
+	var fileNameNonces = []
+	// We are generating the nonces here simply because we cannot do that securely
+	// inside the web worker due to the lack of CSPRNG access.
 	for (var i = 0; i < miniLockIDs.length; i++) {
-		nonces.push(
-			nacl.util.encodeBase64(
-				miniLock.crypto.getNonce()
-			)
+		fileInfoNonces.push(
+			miniLock.crypto.getNonce()
+		)
+		fileKeyNonces.push(
+			miniLock.crypto.getNonce()
+		)
+		fileNameNonces.push(
+			miniLock.crypto.getNonce()
 		)
 	}
 	miniLock.crypto.worker.postMessage({
@@ -265,7 +266,10 @@ miniLock.crypto.encryptFile = function(
 		saveName: saveName,
 		fileKey: miniLock.crypto.getFileKey(),
 		fileNonce: miniLock.crypto.getNonce(),
-		nonces: nonces,
+		fileInfoNonces: fileInfoNonces,
+		fileKeyNonces: fileKeyNonces,
+		fileNameNonces: fileNameNonces,
+		ephemeral: nacl.box.keyPair(),
 		miniLockIDs: miniLockIDs,
 		myPublicKey: myPublicKey,
 		mySecretKey: mySecretKey,

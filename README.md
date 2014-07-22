@@ -1,6 +1,8 @@
 #![miniLock](http://minilock.io/files/icon48.png) miniLock
 ##File encryption software that does more with less.
-###Links
+
+[![Build Status](https://travis-ci.org/kaepora/miniLock.svg?branch=master)](https://travis-ci.org/kaepora/miniLock)
+
 * **[Code](https://github.com/kaepora/miniLock)** | **[Issues](https://github.com/kaepora/miniLock/issues)**
 * **HOPE X [Video](https://vimeo.com/101237413) | [Slides](http://minilock.io/files/HOPEX.pdf)**
 * **Follow on [Twitter](https://twitter.com/minilockapp)** for latest project news
@@ -18,7 +20,7 @@ Advancements in elliptic curve cryptography, specifically in systems such as `cu
 
 When first opened, miniLock asks the user for their passphrase which it then uses to derive the user's private and public keys. Via this model, the user can establish their key pair on any computer that has miniLock installed using only this passphrase, without having to manage key files or identities and so on. Thanks to the small key sizes present in `curve25519`, we are guaranteed small, easily tweetable public keys and private keys that can be derived from passphrases. miniLock also contains checks to ensure the passphrases entered by the user are of sufficient entropy. miniLock will refuse weak passphrases completely and instead suggest stronger passphrases for use by the user.
 
-miniLock then allows the user to encrypt files to other miniLock users via their miniLock IDs and decrypt files sent to them. miniLock's encryption format supports encrypting a single file to multiple recipients with a negligible increase in file size. Another feature is that analyzing a miniLock-encrypted file does not yield the miniLock IDs of the recipients, only of the sender.
+miniLock then allows the user to encrypt files to other miniLock users via their miniLock IDs and decrypt files sent to them. miniLock's encryption format supports encrypting a single file to multiple recipients with a negligible increase in file size. Another feature is that analyzing a miniLock-encrypted file does not yield the miniLock IDs or identities of the sender or the recipient(s). Upon decryption, a legitimate recipient will be able to know and verify the identity of the sender, but will still be unable to determine the identity of other potential recipients.
 
 miniLock file encryption provides both confidentiality and integrity. miniLock uses the [TweetNaCL](http://tweetnacl.cr.yp.to) cryptography library, [ported to JavaScript](https://github.com/dchest/tweetnacl-js), entirely due to its focus on simplicity, auditability and small size. Similarly, miniLock is designed to be as simple, portable, auditable and usable as possible. miniLock also uses [scrypt](http://www.tarsnap.com/scrypt.html) for "memory-hard" key derivation.
 
@@ -90,16 +92,23 @@ The header itself is a stringified JSON object which contains information necess
 
 ```
 {
-	senderID: Sender's miniLock ID,
+	ephemeral: Public key from ephemeral key pair used to encrypt fileInfo object (Base64),
 	fileInfo: {
-		(One copy of the below object for every recipient.)
+		(One copy of the below object for every recipient)
 		Unique nonce for decrypting this object (Base64): {
-			fileKey: Key for file decryption (Base64),
-			fileName: The file's original filename (String),
+			fileKey: {
+				data: Key for file decryption, encrypted using long-term secret key to recipient's long-term public key (Base64),
+				nonce: Unique nonce for the above (Base64)
+			}
+			fileName: {
+				data: The file's original filename, encrypted using long-term secret key to recipient's long-term public key (Base64),
+				nonce: Unique nonce for the above (Base64)
+			}
 			fileNonce: Nonce for file decryption (Base64),
+			senderID: Sender's miniLock ID (Base58)
 		}
 		(Encrypted with shared secret derived from the sender’s
-		 private key and recipient's public key.
+		 private ephemeral key and recipient's long-term public key.
 		 Stored as Base64 string.)
 	}
 }
@@ -108,22 +117,26 @@ The header itself is a stringified JSON object which contains information necess
 Note that in the above header, `fileName` is padded with the `0x00` byte until it reaches 256 bytes in length. This is done in order to prevent the discovery of the `fileName` length purely by analyzing an encrypted miniLock file's header.
 
 ##4. File encryption
-We begin by appending the bytes signalling the beginning of the header to the final encrypted file.
+We begin by generating an ephemeral `curve25519` key pair.
+
+We append the bytes signalling the beginning of the header to the final encrypted file.
 
 A random 32-byte `fileKey` and a random 24-byte `fileNonce` are generated and used to symmetrically encrypt the plaintext bytes using TweetNaCL's `xsalsa20-poly1305` construction.
 
-`fileKey`, `fileNonce` and `fileName` (the file's intended name upon decryption) are then stored within the JSON header as described in §3. The name of the `fileInfo` property in which they are stored is a 24-byte nonce, which is used to then encrypt the underlying object asymmetrically according to the recipient's public key(s) using TweetNaCL's `curve25519-xsalsa20-poly1305` construction. This is done once for every recipient. For `n` recipients, we will obtain `n` properties of `fileInfo` with nonces as the property name and a Base64-encrypted object as the property value.
+`fileKey` and `fileName` (the file's intended name upon decryption) are encrypted with the sender's long-term key pair and stored within the JSON header along with `fileNonce` and `senderID`, as described in §3.
 
-TweetNaCL's `curve25519-xsalsa20-poly1305` construction provides authenticated encryption, guaranteeing both confidentiality and ciphertext integrity.
+The name of the `fileInfo` property in which the aforementioned elements are stored is a 24-byte nonce. We use this nonce, along with our ephemeral key pair, to encrypt the underlying JSON object asymmetrically to the recipient's public key, using TweetNaCL's `curve25519-xsalsa20-poly1305` construction. This is done once for every recipient, creating a different `fileInfo` object for every recipient, each labeled by their unique nonces. For `n` recipients, we will obtain `n` properties of `fileInfo` with nonces as the property name and a Base64-encrypted object as the property value. Note that ephemeral key pairs are only used once, only for one file, and then discarded.
 
 Finally, we append the bytes signalling the end of the header, followed by the ciphertext bytes.
 
+TweetNaCL's `curve25519-xsalsa20-poly1305` construction provides authenticated encryption, guaranteeing both confidentiality and ciphertext integrity. The above header construction also provides forward secrecy from file to file, and makes it impossible to determine the sender or recipient(s) of a miniLock-encrypted file simply by analyzing the ciphertext.
+
 ##5. File decryption
-In order to decrypt the file, the recipient needs the `fileKey` and the `fileNonce`, which are within the `fileInfo` section of the header. They also will need the `senderID` property of the header in order to derive the shared secret which can be used to decrypt their copies of the `fileKey` and `fileNonce` contained within `fileInfo`.
+In order to decrypt the file, the recipient needs the information stored within the `fileInfo` section of the header. They also will need the `ephemeral` property of the header in order to derive the shared secret, in conjunction with their long-term secret key, which can be used to decrypt their copy of the `fileInfo` header object.
 
-If there are multiple properties within `fileInfo`, the recipient must iterate through every property until she obtains an authenticated decryption of the underlying object. Once a successful authenticated decryption of a `fileInfo` property occurs, the recipient can then use the obtained `fileKey` and `fileNonce` to perform an authenticated decryption of the ciphertext bytes. The recipient then proceeds to remove the padding of `0x00` bytes from `fileName` in order to obtain the intended file name. The recipient is now capable of saving the decrypted file.
+If there are multiple properties within `fileInfo`, the recipient must iterate through every property until she obtains an authenticated decryption of the underlying object. Once a successful authenticated decryption of a `fileInfo` property occurs, the recipient can then use the obtained `senderID` along with their long-term secret key to decrypt `fileKey` and use it in conjunction with `fileNonce` to perform an authenticated decryption of the ciphertext bytes. The recipient then decrypts `fileName` (again using `senderID`), and removes the padding of `0x00` bytes from the decrypted `fileName` in order to obtain the intended file name. The recipient is now capable of saving the decrypted file.
 
-If the authenticated asymmetric decryption of the header object fails, or the authenticated symmetric decryption of the file ciphertext fails, we return an error to the user and halt decryption. No partial data is returned.
+If the authenticated asymmetric decryption of any header object fails, or the authenticated symmetric decryption of the file ciphertext fails, we return an error to the user and halt decryption. No partial data is returned.
 
 ##6. Key Identity Authentication
 In PGP, public keys can be substantially larger than miniLock IDs, therefore necessitating the generation of key fingerprints which can then be used for out-of-band key identity authentication. With miniLock, users are able to authenticate out-of-band directly using the miniLock ID, due to its small length (approximately 44 Base58-encoded characters). Therefore, no specialized key identity authentication mechanism is required.
@@ -134,9 +147,11 @@ miniLock is not intended to protect against malicious files being sent and recei
 ##8. Thanks
 Sincere thanks are presented to Dr. Matthew D. Green and Meredith L. Patterson, who gave feedback on an early draft of this document.
 
-Sincere thanks are presented to Dr. Mario Heiderich and his team at [Cure53](https://cure53.de/) for their work on performing a full audit of the miniLock codebase. We also sincerely thank the [Open Technology Fund](https://www.opentechfund.org/) for funding the audit.
+Sincere thanks are presented to Trevor Perrin for his invaluable contribution to miniLock's design, which introduced sender ID anonymity in the ciphertext and forward secrecy between files.
 
-Sincere thanks are presented to Dmitry Chestnykh for his work on porting TweetNaCL to JavaScript and his general cooperation with the miniLock project.
+Sincere thanks are presented to Dmitry Chestnykh for his work on porting TweetNaCL to JavaScript and his general cooperation with the miniLock project, including many helpful and crucial suggestions.
+
+Sincere thanks are presented to Dr. Mario Heiderich and his team at [Cure53](https://cure53.de/) for their work on performing a full audit of the miniLock codebase. We also sincerely thank the [Open Technology Fund](https://www.opentechfund.org/) for funding the audit.
 
 ##9. Credits
 **miniLock**

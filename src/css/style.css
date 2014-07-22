@@ -175,8 +175,11 @@ div.unlock p {
 }
 
 div.unlock input.miniLockKey {
-	font-size: 1.3em;
+	font-size: 0.7em;
 	width: 450px;
+	height: 23px;
+	position: relative;
+	bottom: 4px;
 	font-family: 'Octicons';
 }
 
@@ -275,37 +278,38 @@ input.fileSelectDialog {
 }
 
 div.myMiniLockID {
-	border-radius: 10px;
-	width: 455px;
 	margin: 50px auto 0 auto;
+	text-align: center;
+}
+
+div.myMiniLockID * {
+	display: inline-block;
+	vertical-align: top;
+	height: 25px;
+	margin: 0 -1px;
+	padding: 5px;
+	border: 0;
+	font-weight: bold;
 }
 
 div.myMiniLockID span {
-	background: rgba(255, 255, 255, 0.3);
 	border-radius: 5px 0 0 5px;
-	display: inline;
-	height: 25px;
 	font-size: 0.8em;
-	font-weight: bold;
-	padding: 5px;
+	background: rgba(255, 255, 255, 0.3);
 	cursor: default;
 	user-select: none;
 	-webkit-user-select: none;
 	-moz-user-select: none;
 }
 
-div.myMiniLockID input {
-	border: none;
-	padding: 5px;
-	margin: 0 0 0 -3px;
-	position: relative;
-	bottom: 2px;
-	height: 18px;
-	width: 333px;
+div.myMiniLockID code {
 	border-radius: 0 5px 5px 0;
-	background: rgba(255, 255, 255, 0.1);
+	font-size: 0.75em;
 	font-family: monospace;
+	background: rgba(255, 255, 255, 0.1);
+	-webkit-user-select: text;
 }
+
 
 /*
 	* Square (back)

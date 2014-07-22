@@ -31,7 +31,7 @@ $('form.unlockForm').submit(function() {
 		var keyReadyInterval = setInterval(function() {
 			if (miniLock.session.keyPairReady) {
 				clearInterval(keyReadyInterval)
-				$('div.myMiniLockID input').val(
+				$('div.myMiniLockID code').text(
 					miniLock.crypto.getMiniLockID(
 						miniLock.session.keys.publicKey,
 						miniLock.session.salt
@@ -115,8 +115,13 @@ $('input.fileSelectDialog').change(function(e) {
 	return false
 })
 
+// Click to select the miniLock ID for easy copy-n-paste.
 $('div.myMiniLockID').click(function() {
-	$(this).find('input').select()
+	var range = document.createRange()
+	range.selectNodeContents($(this).find('code').get(0))
+	var selection = window.getSelection()
+	selection.removeAllRanges()
+	selection.addRange(range)
 })
 
 // Handle file selection via drag/drop or browsing.
